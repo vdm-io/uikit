@@ -13,12 +13,12 @@ import { UikitUploader } from './core/UikitUploader';
         const { endpoint, targetClass, ...additionalConfig } = global.vdmUploaderConfig || {};
 
         if (!endpoint) {
-            if (process.env.DEBUG === 'true') console.error('Endpoint is not defined, exiting initialization.');
+            if (process.env.DEBUG) console.error('Endpoint is not defined, exiting initialization.');
             return;
         }
 
         if (!targetClass) {
-            if (process.env.DEBUG === 'true') console.error('The target class is not defined, exiting initialization.');
+            if (process.env.DEBUG) console.error('The target class is not defined, exiting initialization.');
             return;
         }
 
@@ -30,14 +30,14 @@ import { UikitUploader } from './core/UikitUploader';
             const uploadEndpoint = global.vdmUploaderConfig[id] ? global.vdmUploaderConfig[id].endpoint : null;
 
             if (!uploadEndpoint) {
-                if (process.env.DEBUG === 'true') console.error(`Upload Endpoint for ${id} is not defined, exiting initialization for this field.`);
+                if (process.env.DEBUG) console.error(`Upload Endpoint for ${id} is not defined, exiting initialization for this field.`);
                 return; // Skip this field if no upload endpoint is found
             }
 
             const progressBarId = element.dataset.progressbarId;
             const typeId = element.dataset.typeId;
             // optional
-            const displayEndpoint = global.vdmUploaderConfig[id] ? global.vdmUploaderConfig[id].endpoint_diplay : null;
+            const displayEndpoint = global.vdmUploaderConfig[id] ? global.vdmUploaderConfig[id].endpoint_display : null;
             const displayId = element.dataset.displayId || null;
             const successId = element.dataset.successId || null;
             const errorId = element.dataset.errorId || null;

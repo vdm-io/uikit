@@ -105,17 +105,15 @@ export class UploadHelper {
      */
     init = async (id, guid, reset = false) => {
         if (this.#data[id] && !reset) {
-            process.env.DEBUG === 'true' && console.log(`Field ${id} is already initialized, reusing existing data.`);
+            process.env.DEBUG && console.log(`Field ${id} is already initialized, reusing existing data.`);
             return;
         }
 
         try {
             const url = this.#buildUrl(this.#endpoint, guid);
-            const { DEBUG } = process.env;
-
             const result = await this.#fetchData(url);
 
-            DEBUG === 'true' && console.log('Data fetched:', result);
+            if (process.env.DEBUG) console.log('Data fetched:', result);
 
             if (result?.data && typeof result.data === 'object') {
                 this.set(id, result.data);
@@ -123,7 +121,7 @@ export class UploadHelper {
                 throw new Error(result.error || 'An error occurred during the file type request.');
             }
         } catch (error) {
-            DEBUG === 'true' && console.error('Error during initialization:', error);
+            if (process.env.DEBUG) console.error('Error during initialization:', error);
         }
     };
 
@@ -136,11 +134,11 @@ export class UploadHelper {
     #fetchData = async url => {
         const response = await fetch(url, {
             method: 'GET',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {'Content-Type': 'application/json'},
         });
 
         if (!response.ok) {
-            process.env.DEBUG === 'true' && console.error('Error fetching data:', response);
+            process.env.DEBUG && console.error('Error fetching data:', response);
             return;
         }
 

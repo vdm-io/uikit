@@ -12,7 +12,7 @@ Uploader is an intuitive and lightweight JavaScript solution for embedding uploa
 
    ```html
    <!-- Include the Uploader script from jsDelivr CDN -->
-   <script src="https://cdn.jsdelivr.net/gh/vdm-io/uikit@2.0.5/dist/js/Uploader.min.js"></script>
+   <script src="https://cdn.jsdelivr.net/gh/vdm-io/uikit@latest/dist/js/Uploader.min.js"></script>
    ```
 
 2. **Markup Your Upload Area:**

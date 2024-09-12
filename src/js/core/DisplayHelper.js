@@ -13,7 +13,8 @@
  * await helper.set(endpoint, area, params);
  */
 export class DisplayHelper {
-    constructor() {}
+    constructor() {
+    }
 
     /**
      * Asynchronously fetches HTML content from a specified endpoint and injects it into a specified DOM area.
@@ -41,7 +42,7 @@ export class DisplayHelper {
 
             if (!response.ok) {
                 // If an error occurs, log it in debug mode
-                if (process.env.DEBUG === 'true') {
+                if (process.env.DEBUG) {
                     console.error('Error fetching display data:', response);
                 }
                 return;
@@ -49,22 +50,53 @@ export class DisplayHelper {
 
             const result = await response.json();
 
+            // Check if result contains an error
+            if (result.error) {
+                // Log the error in debug mode and show a user-friendly message
+                if (process.env.DEBUG) {
+                    console.error('Error fetching display data:', result.error);
+                }
+                return;
+            }
+
             // If there's no response.data or it's empty, clear the display area
             if (!result.data || result.data.trim() === '') {
+                // Trigger a custom event before hide files display the entity files
+                const beforeHideFilesDisplay = new CustomEvent('vdm.uikit.uploader.beforeHideFilesDisplay', {
+                    detail: {result, displayArea}
+                });
+                document.dispatchEvent(beforeHideFilesDisplay);
+
                 displayArea.innerHTML = ''; // Empty the display area
+                displayArea.setAttribute('hidden', 'hidden');
+
+                // Trigger a custom event after hide files display the entity files
+                const afterHideFilesDisplay = new CustomEvent('vdm.uikit.uploader.afterHideFilesDisplay', {
+                    detail: {result, displayArea}
+                });
+                document.dispatchEvent(afterHideFilesDisplay);
             } else {
+                // Trigger a custom event before displaying the entity files
+                const beforeFilesDisplayEvent = new CustomEvent('vdm.uikit.uploader.beforeFilesDisplay', {
+                    detail: {result, displayArea}
+                });
+                document.dispatchEvent(beforeFilesDisplayEvent);
+
                 // Replace the display area content with the new HTML
                 displayArea.innerHTML = result.data;
-            }
+                displayArea.removeAttribute('hidden');
 
+                // Trigger a custom event after displaying the entity files
+                const afterFilesDisplayEvent = new CustomEvent('vdm.uikit.uploader.afterFilesDisplay', {
+                    detail: {result, displayArea}
+                });
+                document.dispatchEvent(afterFilesDisplayEvent);
+            }
         } catch (error) {
             // If an error occurs, log it in debug mode
-            if (process.env.DEBUG === 'true') {
+            if (process.env.DEBUG) {
                 console.error('Error fetching display data:', error);
             }
-
-            // Optionally, you can clear the display area on error
-            displayArea.innerHTML = ''; // Empty the display area on failure
         }
     };
 
@@ -80,6 +112,11 @@ export class DisplayHelper {
      * @private
      */
     #buildUrl = (endpoint, params) => {
+        // If no params or params is empty, return the endpoint as is
+        if (!params || Object.keys(params).length === 0) {
+            return endpoint;
+        }
+
         // Convert the params object into URL query string using URLSearchParams
         const separator = endpoint.includes('?') ? '&' : '?';
         const urlParams = new URLSearchParams(params);
