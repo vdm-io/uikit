@@ -2,7 +2,7 @@
   "name": "vdm.uikit.uploader",
   "title": "Uploader",
   "description": "Uploader is an intuitive and lightweight JavaScript solution for embedding upload functionality into your website.",
-  "version": "2.1.1",
+  "version": "2.1.2",
   "main": "dist/js/Uploader.min.js",
   "scripts": {
     "build": "rollup -c"

@@ -110,11 +110,7 @@ export class UikitUploader {
 
             this.#prepareUploadUI(elements, call, successId, errorId);
 
-            if (this.#uploadInstances.hasOwnProperty(id)) {
-                return;
-            }
-
-            this.#uploadInstances[id] = this.#uikit.upload(`#${id}`, {
+            this.#uikit.upload(`#${id}`, {
                 url: this.#buildUrl(uploadEndpoint, typeGuid),
                 multiple: true,
                 allow: this.#uploadHelper.get(call, 'allow', false),
