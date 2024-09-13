@@ -108,8 +108,11 @@ export class UikitUploader {
 
             this.#dispatchEvent('afterElementsInit', {...elements});
 
-            this.#uploadInstances[id]?.$destroy(true);
             this.#prepareUploadUI(elements, call, successId, errorId);
+
+            if (this.#uploadInstances.hasOwnProperty(id)) {
+                return;
+            }
 
             this.#uploadInstances[id] = this.#uikit.upload(`#${id}`, {
                 url: this.#buildUrl(uploadEndpoint, typeGuid),

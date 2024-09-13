@@ -1,5 +1,5 @@
 /**
- * VDM Uikit Uploader v2.1.0
+ * VDM Uikit Uploader v2.1.1
  * https://git.vdm.dev/joomla/uikit
  * (c) 2020 - 2024 Llewellyn van der Merwe
  * MIT License
@@ -435,8 +435,11 @@
 
                 this.#dispatchEvent('afterElementsInit', {...elements});
 
-                this.#uploadInstances[id]?.$destroy(true);
                 this.#prepareUploadUI(elements, call, successId, errorId);
+
+                if (this.#uploadInstances.hasOwnProperty(id)) {
+                    return;
+                }
 
                 this.#uploadInstances[id] = this.#uikit.upload(`#${id}`, {
                     url: this.#buildUrl(uploadEndpoint, typeGuid),
