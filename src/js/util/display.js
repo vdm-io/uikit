@@ -12,7 +12,7 @@
  *
  * await helper.set(endpoint, area, params);
  */
-export class DisplayHelper {
+export class Display {
     constructor() {
     }
 
@@ -29,6 +29,9 @@ export class DisplayHelper {
      */
     set = async (displayEndpoint, displayArea, params) => {
         try {
+            // Trigger a custom event before hide files display the entity files
+            this.#dispatchEvent('beforeGetFilesDisplay', {endpoint: displayEndpoint, element: displayArea, params: params});
+
             // Build the URL with the query parameters
             const url = this.#buildUrl(displayEndpoint, params);
 
@@ -62,35 +65,23 @@ export class DisplayHelper {
             // If there's no response.data or it's empty, clear the display area
             if (!result.data || result.data.trim() === '') {
                 // Trigger a custom event before hide files display the entity files
-                const beforeHideFilesDisplay = new CustomEvent('vdm.uikit.uploader.beforeHideFilesDisplay', {
-                    detail: {result, displayArea}
-                });
-                document.dispatchEvent(beforeHideFilesDisplay);
+                this.#dispatchEvent('beforeHideFilesDisplay', {result: result, element: displayArea});
 
                 displayArea.innerHTML = ''; // Empty the display area
                 displayArea.setAttribute('hidden', 'hidden');
 
                 // Trigger a custom event after hide files display the entity files
-                const afterHideFilesDisplay = new CustomEvent('vdm.uikit.uploader.afterHideFilesDisplay', {
-                    detail: {result, displayArea}
-                });
-                document.dispatchEvent(afterHideFilesDisplay);
+                this.#dispatchEvent('afterHideFilesDisplay', {result: result, element: displayArea});
             } else {
                 // Trigger a custom event before displaying the entity files
-                const beforeFilesDisplayEvent = new CustomEvent('vdm.uikit.uploader.beforeFilesDisplay', {
-                    detail: {result, displayArea}
-                });
-                document.dispatchEvent(beforeFilesDisplayEvent);
+                this.#dispatchEvent('beforeFilesDisplay', {result: result, element: displayArea});
 
                 // Replace the display area content with the new HTML
                 displayArea.innerHTML = result.data;
                 displayArea.removeAttribute('hidden');
 
                 // Trigger a custom event after displaying the entity files
-                const afterFilesDisplayEvent = new CustomEvent('vdm.uikit.uploader.afterFilesDisplay', {
-                    detail: {result, displayArea}
-                });
-                document.dispatchEvent(afterFilesDisplayEvent);
+                this.#dispatchEvent('afterFilesDisplay', {result: result, element: displayArea});
             }
         } catch (error) {
             // If an error occurs, log it in debug mode
@@ -99,6 +90,17 @@ export class DisplayHelper {
             }
         }
     };
+
+    /**
+     * Dispatches a custom event with optional detail data.
+     *
+     * @param {string} eventName - The name of the event to dispatch.
+     * @param {object} [detail={}] - The optional detail data to include with the event.
+     * @return {void}
+     */
+    #dispatchEvent(eventName, detail = {}) {
+        document.dispatchEvent(new CustomEvent(`vdm.uikit.display.${eventName}`, {detail}));
+    }
 
     /**
      * It's a private method that builds a complete URL from the endpoint and an object containing parameters.

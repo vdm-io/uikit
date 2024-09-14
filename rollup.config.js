@@ -6,12 +6,12 @@ import license from 'rollup-plugin-license';
 import replace from '@rollup/plugin-replace';
 
 const licenseLine = {
-    banner: `/*! VDM Uikit Uploader v${require('./package.json').version} | https://git.vdm.dev/joomla/uikit | (c) 2020 - ${new Date().getFullYear()} Llewellyn van der Merwe | MIT License */`
+    banner: `/*! VDM Uikit v${require('./package.json').version} | https://git.vdm.dev/joomla/uikit | (c) 2020 - ${new Date().getFullYear()} Llewellyn van der Merwe | MIT License */`
 };
 
 const licenseHeader = {
     banner: `/**
- * VDM Uikit Uploader v${require('./package.json').version}
+ * VDM Uikit v${require('./package.json').version}
  * https://git.vdm.dev/joomla/uikit
  * (c) 2020 - ${new Date().getFullYear()} Llewellyn van der Merwe
  * MIT License
@@ -20,7 +20,7 @@ const licenseHeader = {
 
 export default [
     {
-        input: 'src/js/Uploader.js',
+        input: 'src/js/vdm.js',
         plugins: [
             license(licenseHeader),
             replace({
@@ -31,17 +31,17 @@ export default [
             commonjs()
         ],
         output: {
-            file: 'dist/js/Uploader.js',
+            file: 'dist/js/vdm.js',
             format: 'iife',
-            name: 'Uploader',
+            name: 'VDMUikit',
             globals: {
-                uikit: 'UIkit',
+                uikit: 'UIkit'
             }
         },
         external: ['uikit'],  // UIkit is treated as external
     },
     {
-        input: 'src/js/Uploader.js',
+        input: 'src/js/vdm.js',
         plugins: [
             resolve(),  // Resolves local and node modules
             commonjs(),
@@ -58,11 +58,11 @@ export default [
         ],
         external: ['uikit'],  // UIkit is treated as external
         output: {
-            file: 'dist/js/Uploader.min.js',
+            file: 'dist/js/vdm.min.js',
             format: 'iife',
-            name: 'Uploader',
+            name: 'VDMUikit',
             globals: {
-                uikit: 'UIkit',
+                uikit: 'UIkit'
             },
         },
     },

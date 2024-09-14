@@ -1,28 +1,42 @@
-import {UploadHelper} from './UploadHelper.js';
-import {DisplayHelper} from './DisplayHelper.js';
+import {FileType} from '../util/file-type.js';
+import {Display} from '../util/display.js';
 
 /**
- * Helper class for uploading files.
+ * Class for uploading files.
  *
  * @class
  * @classdesc This class provides methods for uploading files to a server.
  */
-export class UikitUploader {
-    #uploadHelper;
-    #displayHelper;
-    #uikit;
-    #uploadInstances = {};
+export class UploadFile {
+    /**
+     * Utility class for uploading files.
+     *
+     * @class
+     */
+    #fileType;
 
     /**
-     * Creates an instance of the UikitUploader class.
+     * Helper class for displaying elements on the UI.
+     *
+     * @class
+     */
+    #display;
+
+    /**
+     * The UIKit variable is a reference to a UI framework for building web applications.
+     */
+    #uikit;
+
+    /**
+     * Creates an instance of the UploadFile class.
      *
      * @param {Object} config - Configuration details for uploader instances.
      * @param {string} endpoint - The endpoint where the files will be uploaded.
      * @param {any} uikit - Reference to UIKit.
      */
     constructor(config, endpoint, uikit) {
-        this.#uploadHelper = new UploadHelper(endpoint);
-        this.#displayHelper = new DisplayHelper();
+        this.#fileType = new FileType(endpoint);
+        this.#display = new Display();
         this.#uikit = uikit;
 
         this.#initializeFields(config);
@@ -63,13 +77,13 @@ export class UikitUploader {
                 try {
                     await this.#initUpload(id, guid, bar, endpoint, successId, errorId, allowedFormatId, fileTypeId, displayId, displayEndpoint);
                 } catch (error) {
-                    this.#notifyError(error.message);
+                    this.#showNotification(error.message, 'danger');
                 }
             }
         };
 
         typeField.addEventListener('change', () => initializeUpload(typeField.value));
-        initializeUpload(typeField.value).catch(error => this.#notifyError(error.message));
+        initializeUpload(typeField.value).catch(error => this.#showNotification(error.message, 'danger'));
     }
 
     /**
@@ -102,7 +116,7 @@ export class UikitUploader {
             });
 
             const call = `${id}${typeGuid}`;
-            await this.#uploadHelper.init(call, typeGuid, true);
+            await this.#fileType.init(call, typeGuid, true);
 
             const elements = this.#getUploadElements(progressBarId, successId, errorId, allowedFormatId, fileTypeId, displayId);
 
@@ -113,8 +127,8 @@ export class UikitUploader {
             this.#uikit.upload(`#${id}`, {
                 url: this.#buildUrl(uploadEndpoint, typeGuid),
                 multiple: true,
-                allow: this.#uploadHelper.get(call, 'allow', false),
-                name: this.#uploadHelper.get(call, 'name', 'files'),
+                allow: this.#fileType.get(call, 'allow', false),
+                name: this.#fileType.get(call, 'name', 'files'),
                 beforeSend: (env) => this.#handleBeforeSend(call, env),
                 beforeAll: (files) => this.#dispatchEvent('beforeAll', {files}),
                 load: (e) => this.#dispatchEvent('load', {event: e}),
@@ -132,50 +146,57 @@ export class UikitUploader {
 
     /**
      * Returns the required HTML elements by their IDs.
+     * If an element ID is null or the element does not exist on the page,
+     * the corresponding value in the returned object will be null.
      *
-     * @param {string} progressBarId - The ID of the progress bar element.
-     * @param {string} successId - The ID of the success message element.
-     * @param {string} errorId - The ID of the error message element.
-     * @param {string} allowedFormatId - The ID of the allowed format span element.
-     * @param {string} fileTypeId - The ID of the file type span element.
-     * @param {string} displayId - The ID of the display area element.
-     * @returns {object} - An object containing the required HTML elements.
+     * @param {string|null} progressBarId - The ID of the progress bar element, or null.
+     * @param {string|null} successId - The ID of the success message element, or null.
+     * @param {string|null} errorId - The ID of the error message element, or null.
+     * @param {string|null} allowedFormatId - The ID of the allowed format span element, or null.
+     * @param {string|null} fileTypeId - The ID of the file type span element, or null.
+     * @param {string|null} displayId - The ID of the display area element, or null.
+     * @returns {object} - An object containing the required HTML elements or null if they do not exist.
      */
     #getUploadElements(progressBarId, successId, errorId, allowedFormatId, fileTypeId, displayId) {
         return {
-            progressBar: document.getElementById(progressBarId),
-            successMessage: document.getElementById(successId),
-            errorMessage: document.getElementById(errorId),
-            allowedFormatSpan: document.getElementById(allowedFormatId),
-            fileTypeSpan: document.getElementById(fileTypeId),
-            displayArea: document.getElementById(displayId)
+            progressBar: progressBarId ? document.getElementById(progressBarId) : null,
+            successMessage: successId ? document.getElementById(successId) : null,
+            errorMessage: errorId ? document.getElementById(errorId) : null,
+            allowedFormatSpan: allowedFormatId ? document.getElementById(allowedFormatId) : null,
+            fileTypeSpan: fileTypeId ? document.getElementById(fileTypeId) : null,
+            displayArea: displayId ? document.getElementById(displayId) : null
         };
     }
 
     /**
      * Initializes the display area with data from the display endpoint.
      *
-     * @param {string} displayEndpoint - The endpoint to retrieve the display data from.
-     * @param {string} displayId - The id of the display area element in the DOM.
+     * @param {string|null} displayEndpoint - The endpoint to retrieve the display data from.
+     * @param {string|null} displayId - The id of the display area element in the DOM.
      * @param {object} params - Additional parameters to be passed to the display helper.
-     *
      * @return {void}
      */
     #setupDisplayArea(displayEndpoint, displayId, params = {}) {
-        const displayArea = document.getElementById(displayId);
+        const displayArea = displayId ? document.getElementById(displayId) : null;
         if (displayEndpoint && displayArea) {
-            this.#displayHelper.set(displayEndpoint, displayArea, params);
+            this.#display.set(displayEndpoint, displayArea, params);
         }
     }
 
     /**
-     * Notifies the user of an error using UIKit notifications.
+     * Displays a notification with the given message and status.
      *
-     * @param {string} message - The error message to display.
-     * @return {void}
+     * @param {string} message - The message to be displayed in the notification.
+     * @param {string} status - The status of the notification (e.g., 'success', 'error', 'warning').
+     * @return {void} - Does not return a value.
      */
-    #notifyError(message) {
-        this.#uikit.notification({message, status: 'danger', timeout: 7000});
+    #showNotification(message, status) {
+        this.#uikit.notification({
+            message,
+            status,
+            pos: 'top-center',
+            timeout: 7000
+        });
     }
 
     /**
@@ -225,8 +246,8 @@ export class UikitUploader {
     #prepareUploadUI(elements, call, successId, errorId) {
         if (elements.successMessage) elements.successMessage.setAttribute('hidden', 'hidden');
         if (elements.errorMessage) elements.errorMessage.setAttribute('hidden', 'hidden');
-        if (elements.allowedFormatSpan) elements.allowedFormatSpan.innerHTML = this.#uploadHelper.get(call, 'allow_span', '');
-        if (elements.fileTypeSpan) elements.fileTypeSpan.innerHTML = this.#uploadHelper.get(call, 'file_type_span', 'file');
+        if (elements.allowedFormatSpan) elements.allowedFormatSpan.innerHTML = this.#fileType.get(call, 'allow_span', '');
+        if (elements.fileTypeSpan) elements.fileTypeSpan.innerHTML = this.#fileType.get(call, 'file_type_span', 'file');
     }
 
     /**
@@ -238,7 +259,7 @@ export class UikitUploader {
      */
     #handleBeforeSend(call, environment) {
         this.#dispatchEvent('beforeSend', {environment});
-        environment.data.params = this.#uploadHelper.getParams(this.#uploadHelper.get(call, 'param_fields'));
+        environment.data.params = this.#fileType.getParams(this.#fileType.get(call, 'param_fields'));
         this.#dispatchEvent('afterSendPreparation', {environment});
     }
 
@@ -262,13 +283,15 @@ export class UikitUploader {
      * Handles the upload completion.
      *
      * @param {XMLHttpRequest} xhr - The XMLHttpRequest object representing the upload request.
-     * @param {HTMLElement} successMessage - The success message element to display.
+     * @param {HTMLElement|null} successMessage - The success message element to display.
      */
     #handleComplete(xhr, successMessage) {
         this.#dispatchEvent('complete', {xhr});
         if (successMessage) {
             successMessage.removeAttribute('hidden');
             successMessage.textContent = 'Upload completed successfully.';
+        } else {
+            this.#showNotification('Upload completed successfully.', 'primary');
         }
     }
 
@@ -276,7 +299,7 @@ export class UikitUploader {
      * Handles the loadStart event.
      *
      * @param {Event} e - The loadStart event object.
-     * @param {HTMLElement} progressBar - The progress bar element. Optional.
+     * @param {HTMLElement|null} progressBar - The progress bar element. Optional.
      * @return {void}
      */
     #handleLoadStart(e, progressBar) {
@@ -292,7 +315,7 @@ export class UikitUploader {
      * Handles the progress event.
      *
      * @param {Event} e - The progress event.
-     * @param {Element} progressBar - The progress bar element.
+     * @param {Element|null} progressBar - The progress bar element.
      *
      * @return {void}
      */
@@ -308,7 +331,7 @@ export class UikitUploader {
      * Handles the loadEnd event.
      *
      * @param {Event} e - The loadEnd event object.
-     * @param {Element} progressBar - The progress bar element to update.
+     * @param {Element|null} progressBar - The progress bar element to update.
      *
      * @return {void}
      */
@@ -324,11 +347,11 @@ export class UikitUploader {
      * Handles the completion of all uploads.
      *
      * @param {XMLHttpRequest} xhr - The XMLHttpRequest object used for the uploads.
-     * @param {HTMLElement} progressBar - The progress bar element.
-     * @param {HTMLElement} successMessage - The success message element.
-     * @param {HTMLElement} errorMessage - The error message element.
-     * @param {string} displayEndpoint - The display endpoint.
-     * @param {string} displayId - The display ID.
+     * @param {HTMLElement|null} progressBar - The progress bar element.
+     * @param {HTMLElement|null} successMessage - The success message element.
+     * @param {HTMLElement|null} errorMessage - The error message element.
+     * @param {string|null} displayEndpoint - The display endpoint.
+     * @param {string|null} displayId - The display ID.
      * @param {Object} call - The call object.
      *
      * @return {void}
@@ -342,6 +365,6 @@ export class UikitUploader {
                 if (errorMessage) errorMessage.setAttribute('hidden', 'hidden');
             }, 5000);
         }
-        this.#setupDisplayArea(displayEndpoint, displayId, this.#uploadHelper.getParams(this.#uploadHelper.get(call, 'display_fields')));
+        this.#setupDisplayArea(displayEndpoint, displayId, this.#fileType.getParams(this.#fileType.get(call, 'display_fields')));
     }
 }

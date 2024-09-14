@@ -1,8 +1,8 @@
-# VDM Uikit Uploader Integration Guide
+# VDM Uikit File Integration Guide
 
 ## Overview
 
-Uploader is an intuitive and lightweight JavaScript solution for embedding upload functionality into your website. By simply adding the `Uploader` class to any element that triggers an upload, you can enable users to upload files easily.
+Upload/Delete is an intuitive and lightweight JavaScript solution for embedding upload functionality into your website. By simply adding the `vdm-uikit` class to any element that triggers an upload, you can enable users to upload files easily.
 
 ## How to Add Uploader to Your Website
 
@@ -12,12 +12,12 @@ Uploader is an intuitive and lightweight JavaScript solution for embedding uploa
 
    ```html
    <!-- Include the Uploader script from jsDelivr CDN -->
-   <script src="https://cdn.jsdelivr.net/gh/vdm-io/uikit@latest/dist/js/Uploader.min.js"></script>
+   <script src="https://cdn.jsdelivr.net/gh/vdm-io/uikit@latest/dist/js/vdm.min.js"></script>
    ```
 
 2. **Markup Your Upload Area:**
 
-   In the body of your HTML document, apply the `vdm-uikit-uploader` class to any element that should trigger an upload action. Here is an example using a custom div:
+   In the body of your HTML document, apply the `vdm-uikit` class to any element that should trigger an upload action. Here is an example using a custom div:
 
    ```html
    <select id="type-field-id" class="uk-select" aria-label="Select">
@@ -25,7 +25,7 @@ Uploader is an intuitive and lightweight JavaScript solution for embedding uploa
         <option value="guid-value-2">Option 02</option>
    </select>
 
-   <div id="upload_id" class="vdm-uikit-uploader uk-placeholder uk-text-center"
+   <div id="upload_id" class="vdm-uikit uk-placeholder uk-text-center"
         data-type-id="type-field-id"
         data-progressbar-id="progressbar-id"
         data-display-id="display-id"
@@ -51,23 +51,24 @@ Uploader is an intuitive and lightweight JavaScript solution for embedding uploa
 
 3. **Initializing the Uploader:**
 
-   The script will automatically initialize all elements with the `vdm-uikit-uploader` class. You don’t need to manually initialize it unless additional customization is required.
+   The script will automatically initialize all elements with the `vdm-uikit` class. You don’t need to manually initialize it unless additional customization is required.
 
 4. **Customization:**
 
    You must set the various field configurations this way (before loading the class file):
    ```js
    <script>
-   window.vdmUploaderConfig = {
-      endpoint: 'https://your-type-endpoint.com',
-      targetClass: 'vdm-uikit-uploader',
+   window.vdm.uikit.config = {
+      endpoint_type: 'https://your-type-endpoint.com',
+      target_class: 'vdm-uikit',
       upload_id: {
-         endpoint: 'https://your-upload-endpoint.com',
-         endpoint_diplay: 'https://your-display-endpoint.com'
+         endpoint_upload: 'https://your-upload-endpoint.com',
+         endpoint_diplay: 'https://your-display-endpoint.com',
+         endpoint_delete: 'https://your-delete-endpoint.com'
       }
    };
    </script>
-   <script src="https://cdn.jsdelivr.net/gh/vdm-io/uikit@2.0.5/dist/js/Uploader.min.js"></script>
+   <script src="https://cdn.jsdelivr.net/gh/vdm-io/uikit@latest/dist/js/vdm.min.js"></script>
    ```
 
 ### Preventing UIkit Collisions

@@ -1,12 +1,12 @@
 /**
- * `UploadHelper` is a utility class that simplifies operations related to file uploading.
+ * `FileType` is a utility class that simplifies operations related to file uploading.
  * It handles the storage and retrieval of metadata associated with each upload and initializes
  * the upload process by setting up endpoint configuration. It also provides methods for
  * triggering the upload activities in an asynchronous manner.
  *
  * @class
  * @example
- * const helper = new UploadHelper('http://example.com/upload');
+ * const helper = new FileType('http://example.com/upload');
  * const uniqueId = 'file123';
  * const globalId = 'glob124';
  * const data = { user: 'John Doe', file: 'myfile.txt' };
@@ -14,7 +14,7 @@
  * helper.set(uniqueId, data);
  * await helper.init(uniqueId, globalId);
  */
-export class UploadHelper {
+export class FileType {
     /**
      * The endpoint to which files would be uploaded.
      * Stored as a private property and used internally within the class methods.
@@ -26,7 +26,7 @@ export class UploadHelper {
     #endpoint;
 
     /**
-     * It is a private object used to store the data associated with an instance of `UploadHelper`.
+     * It is a private object used to store the data associated with an instance of `FileType`.
      * Default is an empty object.
      * This data is used when performing uploads.
      *
@@ -36,9 +36,9 @@ export class UploadHelper {
     #data = {};
 
     /**
-     * Constructor for the UploadHelper class.
+     * Constructor for the FileType class.
      *
-     * @param {string} endpoint - The endpoint to be associated with the instance of the UploadHelper.
+     * @param {string} endpoint - The endpoint to be associated with the instance of the FileType.
      */
     constructor(endpoint) {
         // Initialize private field with passed endpoint argument
@@ -94,7 +94,7 @@ export class UploadHelper {
     };
 
     /**
-     * Asynchronously initializes the UploadHelper object.
+     * Asynchronously initializes the FileType object.
      *
      * @param {string} id - The unique identifier associated with the initialization.
      * @param {string} guid - The globally unique identifier used to build the URL for fetching.
@@ -110,7 +110,7 @@ export class UploadHelper {
         }
 
         try {
-            const url = this.#buildUrl(this.#endpoint, guid);
+            const url = this.#buildUrl(guid);
             const result = await this.#fetchData(url);
 
             if (process.env.DEBUG) console.log('Data fetched:', result);
@@ -178,16 +178,15 @@ export class UploadHelper {
     /**
      * Builds a URL appending a unique identifier as a parameter.
      *
-     * @param {string} endpoint - The base endpoint of the URL.
      * @param {string} guid - The globally unique identifier to append to the URL.
      * @returns {string} The constructed URL with the appended unique identifier.
      * @private
      */
-    #buildUrl = (endpoint, guid) => {
+    #buildUrl = (guid) => {
         // Determine the appropriate separator for the query parameter
-        const separator = endpoint.includes('?') ? '&' : '?';
+        const separator = this.#endpoint.includes('?') ? '&' : '?';
 
         // Return the constructed URL
-        return `${endpoint}${separator}guid=${guid}`;
+        return `${this.#endpoint}${separator}guid=${guid}`;
     };
 }

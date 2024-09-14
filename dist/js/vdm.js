@@ -1,5 +1,5 @@
 /**
- * VDM Uikit Uploader v2.1.2
+ * VDM Uikit v3.0.0
  * https://git.vdm.dev/joomla/uikit
  * (c) 2020 - 2024 Llewellyn van der Merwe
  * MIT License
@@ -9,14 +9,14 @@
     'use strict';
 
     /**
-     * `UploadHelper` is a utility class that simplifies operations related to file uploading.
+     * `FileType` is a utility class that simplifies operations related to file uploading.
      * It handles the storage and retrieval of metadata associated with each upload and initializes
      * the upload process by setting up endpoint configuration. It also provides methods for
      * triggering the upload activities in an asynchronous manner.
      *
      * @class
      * @example
-     * const helper = new UploadHelper('http://example.com/upload');
+     * const helper = new FileType('http://example.com/upload');
      * const uniqueId = 'file123';
      * const globalId = 'glob124';
      * const data = { user: 'John Doe', file: 'myfile.txt' };
@@ -24,7 +24,7 @@
      * helper.set(uniqueId, data);
      * await helper.init(uniqueId, globalId);
      */
-    class UploadHelper {
+    class FileType {
         /**
          * The endpoint to which files would be uploaded.
          * Stored as a private property and used internally within the class methods.
@@ -36,7 +36,7 @@
         #endpoint;
 
         /**
-         * It is a private object used to store the data associated with an instance of `UploadHelper`.
+         * It is a private object used to store the data associated with an instance of `FileType`.
          * Default is an empty object.
          * This data is used when performing uploads.
          *
@@ -46,9 +46,9 @@
         #data = {};
 
         /**
-         * Constructor for the UploadHelper class.
+         * Constructor for the FileType class.
          *
-         * @param {string} endpoint - The endpoint to be associated with the instance of the UploadHelper.
+         * @param {string} endpoint - The endpoint to be associated with the instance of the FileType.
          */
         constructor(endpoint) {
             // Initialize private field with passed endpoint argument
@@ -104,7 +104,7 @@
         };
 
         /**
-         * Asynchronously initializes the UploadHelper object.
+         * Asynchronously initializes the FileType object.
          *
          * @param {string} id - The unique identifier associated with the initialization.
          * @param {string} guid - The globally unique identifier used to build the URL for fetching.
@@ -120,7 +120,7 @@
             }
 
             try {
-                const url = this.#buildUrl(this.#endpoint, guid);
+                const url = this.#buildUrl(guid);
                 const result = await this.#fetchData(url);
 
                 if (true) console.log('Data fetched:', result);
@@ -188,17 +188,16 @@
         /**
          * Builds a URL appending a unique identifier as a parameter.
          *
-         * @param {string} endpoint - The base endpoint of the URL.
          * @param {string} guid - The globally unique identifier to append to the URL.
          * @returns {string} The constructed URL with the appended unique identifier.
          * @private
          */
-        #buildUrl = (endpoint, guid) => {
+        #buildUrl = (guid) => {
             // Determine the appropriate separator for the query parameter
-            const separator = endpoint.includes('?') ? '&' : '?';
+            const separator = this.#endpoint.includes('?') ? '&' : '?';
 
             // Return the constructed URL
-            return `${endpoint}${separator}guid=${guid}`;
+            return `${this.#endpoint}${separator}guid=${guid}`;
         };
     }
 
@@ -216,7 +215,7 @@
      *
      * await helper.set(endpoint, area, params);
      */
-    class DisplayHelper {
+    class Display {
         constructor() {
         }
 
@@ -233,6 +232,9 @@
          */
         set = async (displayEndpoint, displayArea, params) => {
             try {
+                // Trigger a custom event before hide files display the entity files
+                this.#dispatchEvent('beforeGetFilesDisplay', {endpoint: displayEndpoint, element: displayArea, params: params});
+
                 // Build the URL with the query parameters
                 const url = this.#buildUrl(displayEndpoint, params);
 
@@ -266,35 +268,23 @@
                 // If there's no response.data or it's empty, clear the display area
                 if (!result.data || result.data.trim() === '') {
                     // Trigger a custom event before hide files display the entity files
-                    const beforeHideFilesDisplay = new CustomEvent('vdm.uikit.uploader.beforeHideFilesDisplay', {
-                        detail: {result, displayArea}
-                    });
-                    document.dispatchEvent(beforeHideFilesDisplay);
+                    this.#dispatchEvent('beforeHideFilesDisplay', {result: result, element: displayArea});
 
                     displayArea.innerHTML = ''; // Empty the display area
                     displayArea.setAttribute('hidden', 'hidden');
 
                     // Trigger a custom event after hide files display the entity files
-                    const afterHideFilesDisplay = new CustomEvent('vdm.uikit.uploader.afterHideFilesDisplay', {
-                        detail: {result, displayArea}
-                    });
-                    document.dispatchEvent(afterHideFilesDisplay);
+                    this.#dispatchEvent('afterHideFilesDisplay', {result: result, element: displayArea});
                 } else {
                     // Trigger a custom event before displaying the entity files
-                    const beforeFilesDisplayEvent = new CustomEvent('vdm.uikit.uploader.beforeFilesDisplay', {
-                        detail: {result, displayArea}
-                    });
-                    document.dispatchEvent(beforeFilesDisplayEvent);
+                    this.#dispatchEvent('beforeFilesDisplay', {result: result, element: displayArea});
 
                     // Replace the display area content with the new HTML
                     displayArea.innerHTML = result.data;
                     displayArea.removeAttribute('hidden');
 
                     // Trigger a custom event after displaying the entity files
-                    const afterFilesDisplayEvent = new CustomEvent('vdm.uikit.uploader.afterFilesDisplay', {
-                        detail: {result, displayArea}
-                    });
-                    document.dispatchEvent(afterFilesDisplayEvent);
+                    this.#dispatchEvent('afterFilesDisplay', {result: result, element: displayArea});
                 }
             } catch (error) {
                 // If an error occurs, log it in debug mode
@@ -303,6 +293,17 @@
                 }
             }
         };
+
+        /**
+         * Dispatches a custom event with optional detail data.
+         *
+         * @param {string} eventName - The name of the event to dispatch.
+         * @param {object} [detail={}] - The optional detail data to include with the event.
+         * @return {void}
+         */
+        #dispatchEvent(eventName, detail = {}) {
+            document.dispatchEvent(new CustomEvent(`vdm.uikit.display.${eventName}`, {detail}));
+        }
 
         /**
          * It's a private method that builds a complete URL from the endpoint and an object containing parameters.
@@ -329,27 +330,41 @@
     }
 
     /**
-     * Helper class for uploading files.
+     * Class for uploading files.
      *
      * @class
      * @classdesc This class provides methods for uploading files to a server.
      */
-    class UikitUploader {
-        #uploadHelper;
-        #displayHelper;
-        #uikit;
-        #uploadInstances = {};
+    class UploadFile {
+        /**
+         * Utility class for uploading files.
+         *
+         * @class
+         */
+        #fileType;
 
         /**
-         * Creates an instance of the UikitUploader class.
+         * Helper class for displaying elements on the UI.
+         *
+         * @class
+         */
+        #display;
+
+        /**
+         * The UIKit variable is a reference to a UI framework for building web applications.
+         */
+        #uikit;
+
+        /**
+         * Creates an instance of the UploadFile class.
          *
          * @param {Object} config - Configuration details for uploader instances.
          * @param {string} endpoint - The endpoint where the files will be uploaded.
          * @param {any} uikit - Reference to UIKit.
          */
         constructor(config, endpoint, uikit) {
-            this.#uploadHelper = new UploadHelper(endpoint);
-            this.#displayHelper = new DisplayHelper();
+            this.#fileType = new FileType(endpoint);
+            this.#display = new Display();
             this.#uikit = uikit;
 
             this.#initializeFields(config);
@@ -390,13 +405,13 @@
                     try {
                         await this.#initUpload(id, guid, bar, endpoint, successId, errorId, allowedFormatId, fileTypeId, displayId, displayEndpoint);
                     } catch (error) {
-                        this.#notifyError(error.message);
+                        this.#showNotification(error.message, 'danger');
                     }
                 }
             };
 
             typeField.addEventListener('change', () => initializeUpload(typeField.value));
-            initializeUpload(typeField.value).catch(error => this.#notifyError(error.message));
+            initializeUpload(typeField.value).catch(error => this.#showNotification(error.message, 'danger'));
         }
 
         /**
@@ -429,7 +444,7 @@
                 });
 
                 const call = `${id}${typeGuid}`;
-                await this.#uploadHelper.init(call, typeGuid, true);
+                await this.#fileType.init(call, typeGuid, true);
 
                 const elements = this.#getUploadElements(progressBarId, successId, errorId, allowedFormatId, fileTypeId, displayId);
 
@@ -440,8 +455,8 @@
                 this.#uikit.upload(`#${id}`, {
                     url: this.#buildUrl(uploadEndpoint, typeGuid),
                     multiple: true,
-                    allow: this.#uploadHelper.get(call, 'allow', false),
-                    name: this.#uploadHelper.get(call, 'name', 'files'),
+                    allow: this.#fileType.get(call, 'allow', false),
+                    name: this.#fileType.get(call, 'name', 'files'),
                     beforeSend: (env) => this.#handleBeforeSend(call, env),
                     beforeAll: (files) => this.#dispatchEvent('beforeAll', {files}),
                     load: (e) => this.#dispatchEvent('load', {event: e}),
@@ -459,50 +474,57 @@
 
         /**
          * Returns the required HTML elements by their IDs.
+         * If an element ID is null or the element does not exist on the page,
+         * the corresponding value in the returned object will be null.
          *
-         * @param {string} progressBarId - The ID of the progress bar element.
-         * @param {string} successId - The ID of the success message element.
-         * @param {string} errorId - The ID of the error message element.
-         * @param {string} allowedFormatId - The ID of the allowed format span element.
-         * @param {string} fileTypeId - The ID of the file type span element.
-         * @param {string} displayId - The ID of the display area element.
-         * @returns {object} - An object containing the required HTML elements.
+         * @param {string|null} progressBarId - The ID of the progress bar element, or null.
+         * @param {string|null} successId - The ID of the success message element, or null.
+         * @param {string|null} errorId - The ID of the error message element, or null.
+         * @param {string|null} allowedFormatId - The ID of the allowed format span element, or null.
+         * @param {string|null} fileTypeId - The ID of the file type span element, or null.
+         * @param {string|null} displayId - The ID of the display area element, or null.
+         * @returns {object} - An object containing the required HTML elements or null if they do not exist.
          */
         #getUploadElements(progressBarId, successId, errorId, allowedFormatId, fileTypeId, displayId) {
             return {
-                progressBar: document.getElementById(progressBarId),
-                successMessage: document.getElementById(successId),
-                errorMessage: document.getElementById(errorId),
-                allowedFormatSpan: document.getElementById(allowedFormatId),
-                fileTypeSpan: document.getElementById(fileTypeId),
-                displayArea: document.getElementById(displayId)
+                progressBar: progressBarId ? document.getElementById(progressBarId) : null,
+                successMessage: successId ? document.getElementById(successId) : null,
+                errorMessage: errorId ? document.getElementById(errorId) : null,
+                allowedFormatSpan: allowedFormatId ? document.getElementById(allowedFormatId) : null,
+                fileTypeSpan: fileTypeId ? document.getElementById(fileTypeId) : null,
+                displayArea: displayId ? document.getElementById(displayId) : null
             };
         }
 
         /**
          * Initializes the display area with data from the display endpoint.
          *
-         * @param {string} displayEndpoint - The endpoint to retrieve the display data from.
-         * @param {string} displayId - The id of the display area element in the DOM.
+         * @param {string|null} displayEndpoint - The endpoint to retrieve the display data from.
+         * @param {string|null} displayId - The id of the display area element in the DOM.
          * @param {object} params - Additional parameters to be passed to the display helper.
-         *
          * @return {void}
          */
         #setupDisplayArea(displayEndpoint, displayId, params = {}) {
-            const displayArea = document.getElementById(displayId);
+            const displayArea = displayId ? document.getElementById(displayId) : null;
             if (displayEndpoint && displayArea) {
-                this.#displayHelper.set(displayEndpoint, displayArea, params);
+                this.#display.set(displayEndpoint, displayArea, params);
             }
         }
 
         /**
-         * Notifies the user of an error using UIKit notifications.
+         * Displays a notification with the given message and status.
          *
-         * @param {string} message - The error message to display.
-         * @return {void}
+         * @param {string} message - The message to be displayed in the notification.
+         * @param {string} status - The status of the notification (e.g., 'success', 'error', 'warning').
+         * @return {void} - Does not return a value.
          */
-        #notifyError(message) {
-            this.#uikit.notification({message, status: 'danger', timeout: 7000});
+        #showNotification(message, status) {
+            this.#uikit.notification({
+                message,
+                status,
+                pos: 'top-center',
+                timeout: 7000
+            });
         }
 
         /**
@@ -552,8 +574,8 @@
         #prepareUploadUI(elements, call, successId, errorId) {
             if (elements.successMessage) elements.successMessage.setAttribute('hidden', 'hidden');
             if (elements.errorMessage) elements.errorMessage.setAttribute('hidden', 'hidden');
-            if (elements.allowedFormatSpan) elements.allowedFormatSpan.innerHTML = this.#uploadHelper.get(call, 'allow_span', '');
-            if (elements.fileTypeSpan) elements.fileTypeSpan.innerHTML = this.#uploadHelper.get(call, 'file_type_span', 'file');
+            if (elements.allowedFormatSpan) elements.allowedFormatSpan.innerHTML = this.#fileType.get(call, 'allow_span', '');
+            if (elements.fileTypeSpan) elements.fileTypeSpan.innerHTML = this.#fileType.get(call, 'file_type_span', 'file');
         }
 
         /**
@@ -565,7 +587,7 @@
          */
         #handleBeforeSend(call, environment) {
             this.#dispatchEvent('beforeSend', {environment});
-            environment.data.params = this.#uploadHelper.getParams(this.#uploadHelper.get(call, 'param_fields'));
+            environment.data.params = this.#fileType.getParams(this.#fileType.get(call, 'param_fields'));
             this.#dispatchEvent('afterSendPreparation', {environment});
         }
 
@@ -589,13 +611,15 @@
          * Handles the upload completion.
          *
          * @param {XMLHttpRequest} xhr - The XMLHttpRequest object representing the upload request.
-         * @param {HTMLElement} successMessage - The success message element to display.
+         * @param {HTMLElement|null} successMessage - The success message element to display.
          */
         #handleComplete(xhr, successMessage) {
             this.#dispatchEvent('complete', {xhr});
             if (successMessage) {
                 successMessage.removeAttribute('hidden');
                 successMessage.textContent = 'Upload completed successfully.';
+            } else {
+                this.#showNotification('Upload completed successfully.', 'primary');
             }
         }
 
@@ -603,7 +627,7 @@
          * Handles the loadStart event.
          *
          * @param {Event} e - The loadStart event object.
-         * @param {HTMLElement} progressBar - The progress bar element. Optional.
+         * @param {HTMLElement|null} progressBar - The progress bar element. Optional.
          * @return {void}
          */
         #handleLoadStart(e, progressBar) {
@@ -619,7 +643,7 @@
          * Handles the progress event.
          *
          * @param {Event} e - The progress event.
-         * @param {Element} progressBar - The progress bar element.
+         * @param {Element|null} progressBar - The progress bar element.
          *
          * @return {void}
          */
@@ -635,7 +659,7 @@
          * Handles the loadEnd event.
          *
          * @param {Event} e - The loadEnd event object.
-         * @param {Element} progressBar - The progress bar element to update.
+         * @param {Element|null} progressBar - The progress bar element to update.
          *
          * @return {void}
          */
@@ -651,11 +675,11 @@
          * Handles the completion of all uploads.
          *
          * @param {XMLHttpRequest} xhr - The XMLHttpRequest object used for the uploads.
-         * @param {HTMLElement} progressBar - The progress bar element.
-         * @param {HTMLElement} successMessage - The success message element.
-         * @param {HTMLElement} errorMessage - The error message element.
-         * @param {string} displayEndpoint - The display endpoint.
-         * @param {string} displayId - The display ID.
+         * @param {HTMLElement|null} progressBar - The progress bar element.
+         * @param {HTMLElement|null} successMessage - The success message element.
+         * @param {HTMLElement|null} errorMessage - The error message element.
+         * @param {string|null} displayEndpoint - The display endpoint.
+         * @param {string|null} displayId - The display ID.
          * @param {Object} call - The call object.
          *
          * @return {void}
@@ -669,7 +693,162 @@
                     if (errorMessage) errorMessage.setAttribute('hidden', 'hidden');
                 }, 5000);
             }
-            this.#setupDisplayArea(displayEndpoint, displayId, this.#uploadHelper.getParams(this.#uploadHelper.get(call, 'display_fields')));
+            this.#setupDisplayArea(displayEndpoint, displayId, this.#fileType.getParams(this.#fileType.get(call, 'display_fields')));
+        }
+    }
+
+    /**
+     * Helper class for deleting files from the server.
+     *
+     * @class
+     * @classdesc This class provides methods for deleting files from the server.
+     */
+    class DeleteFile {
+        /**
+         * The endpoint to which files would be deleted.
+         * Stored as a private property and used internally within the class methods.
+         * This field must be a string representing a valid URL.
+         *
+         * @type {string}
+         * @private
+         */
+        #endpoint;
+
+        /**
+         * The UIKit variable is a reference to a UI framework for building web applications.
+         */
+        #uikit;
+
+        /**
+         * The error message that is displayed when the delete endpoint is not configured.
+         *
+         * @type {string}
+         */
+        static ERROR_ENDPOINT = 'Error: The delete endpoint is not configured.';
+
+        /**
+         * Creates an instance of the DeleteHelper class.
+         *
+         * @param {string} endpoint - The endpoint where the files will be uploaded.
+         * @param {any} uikit - Reference to UIKit.
+         */
+        constructor(endpoint, uikit) {
+            this.#endpoint = endpoint;
+            this.#uikit = uikit;
+        }
+
+        /**
+         * Deletes a file with the given fileGuid.
+         *
+         * @param {string} fileGuid - The unique identifier of the file to delete.
+         * @return {void}
+         */
+        delete(fileGuid) {
+            if (!fileGuid || fileGuid.length <= 30) {
+                return;
+            }
+
+            this.#uikit.modal.confirm('Are you sure you want to delete this file! It can not be undone!')
+                .then(() => this.#serverDelete(fileGuid));
+        }
+
+        /**
+         * Deletes a file from the server.
+         *
+         * @param {string} fileGuid - The unique identifier of the file to be deleted.
+         * @return {void}
+         */
+        #serverDelete(fileGuid) {
+            if (!this.#endpoint) {
+                console.error(DeleteFile.ERROR_ENDPOINT);
+                return;
+            }
+
+            this.#dispatchEvent('beforeFileDelete', {guid: fileGuid});
+
+            fetch(this.#buildUrl(fileGuid), {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+                .then(response => response.json())
+                .then(this.#handleResponse.bind(this, fileGuid))
+                .catch(console.error);
+        }
+
+        /**
+         * Handles the response from the server after a file upload.
+         * Removes the file from the UI if the response is successful and shows a success notification.
+         * Shows an error notification if the response contains an error.
+         * @param {string} fileGuid - The unique identifier of the file that was uploaded.
+         * @param {object} data - The response data from the server.
+         * @return {void}
+         */
+        #handleResponse(fileGuid, data) {
+            if (data.success) {
+                this.#fileRemoveFromUI(fileGuid);
+                this.#showNotification(data.success, 'primary');
+                this.#dispatchEvent('afterFileDelete', {data: data, guid: fileGuid});
+            } else if (data.error) {
+                this.#dispatchEvent('onFileDeleteError', {data: data, guid: fileGuid});
+                this.#showNotification(data.error, 'danger');
+            }
+        }
+
+        /**
+         * Displays a notification with the given message and status.
+         *
+         * @param {string} message - The message to be displayed in the notification.
+         * @param {string} status - The status of the notification (e.g., 'success', 'error', 'warning').
+         * @return {void} - Does not return a value.
+         */
+        #showNotification(message, status) {
+            this.#uikit.notification({
+                message,
+                status,
+                pos: 'top-center',
+                timeout: 7000
+            });
+        }
+
+        /**
+         * Remove file from user interface by fileGuid.
+         *
+         * @param {string} fileGuid - The unique identifier of the file.
+         * @example
+         * removeFileFromUI('file123')
+         *
+         * @return {void} - No return value.
+         */
+        #fileRemoveFromUI(fileGuid) {
+            const listItem = document.getElementById(fileGuid);
+            if (listItem) {
+                this.#dispatchEvent('beforeFileRemoveFromUI', {element: listItem, guid: fileGuid});
+                listItem.remove();
+            }
+        }
+
+        /**
+         * Dispatches a custom event with optional detail data.
+         *
+         * @param {string} eventName - The name of the event to dispatch.
+         * @param {object} [detail={}] - The optional detail data to include with the event.
+         * @return {void}
+         */
+        #dispatchEvent(eventName, detail = {}) {
+            document.dispatchEvent(new CustomEvent(`vdm.uikit.delete.${eventName}`, {detail}));
+        }
+
+        /**
+         * Builds a URL by appending the GUID parameter.
+         *
+         * @param {string} guid - The GUID parameter to be appended to the URL.
+         * @return {string} - The constructed URL with the GUID parameter appended.
+         */
+        #buildUrl(guid) {
+            const separator = this.#endpoint.includes('?') ? '&' : '?';
+            return `${this.#endpoint}${separator}guid=${guid}`;
         }
     }
 
@@ -683,35 +862,47 @@
                 UIkitLocal = global.UIkit;
             }
 
-            const { endpoint, targetClass, ...additionalConfig } = global.vdmUploaderConfig || {};
-
-            if (!endpoint) {
-                console.error('Endpoint is not defined, exiting initialization.');
+            if (!global.VDM) {
+                console.error('VDM is not defined, exiting initialization.');
                 return;
             }
 
-            if (!targetClass) {
+            const { endpoint_type, target_class, ...additionalConfig } = global.VDM.uikit.config || {};
+
+            if (!endpoint_type) {
+                console.error('File Type Endpoint is not defined, exiting initialization.');
+                return;
+            }
+
+            if (!target_class) {
                 console.error('The target class is not defined, exiting initialization.');
                 return;
             }
 
-            const uploadElements = document.querySelectorAll('.' + targetClass);
+            const uploadElements = document.querySelectorAll('.' + target_class);
             const config = {};
+
+            // Ensure the global.VDM.uikit.delete_file exists, or initialize it
+            if (!global.VDM.uikit.delete_file) {
+                global.VDM.uikit.delete_file = {};  // Initialize delete_file object if it doesn't exist
+            }
 
             uploadElements.forEach(element => {
                 const id = element.getAttribute('id');
-                const uploadEndpoint = global.vdmUploaderConfig[id] ? global.vdmUploaderConfig[id].endpoint : null;
+                const uploadEndpoint = additionalConfig[id]?.endpoint_upload ?? null;
 
                 if (!uploadEndpoint) {
                     console.error(`Upload Endpoint for ${id} is not defined, exiting initialization for this field.`);
                     return; // Skip this field if no upload endpoint is found
                 }
 
-                const progressBarId = element.dataset.progressbarId;
                 const typeId = element.dataset.typeId;
+
                 // optional
-                const displayEndpoint = global.vdmUploaderConfig[id] ? global.vdmUploaderConfig[id].endpoint_display : null;
+                const progressBarId = element.dataset.progressbarId ?? null;
+                const displayEndpoint = additionalConfig[id]?.endpoint_display ?? null;
                 const displayId = element.dataset.displayId || null;
+                const deleteEndpoint = additionalConfig[id]?.endpoint_delete ?? null;
                 const successId = element.dataset.successId || null;
                 const errorId = element.dataset.errorId || null;
                 const allowedFormatId = element.dataset.allowedFormatId || null;
@@ -728,12 +919,39 @@
                     displayId: displayId,
                     displayEndpoint: displayEndpoint
                 };
+
+                // if delete endpoint found
+                if (deleteEndpoint)
+                {
+                    global.VDM.uikit.delete_file[id] = new DeleteFile(deleteEndpoint, UIkitLocal);
+                }
             });
 
             if (Object.keys(config).length > 0) {
-                new UikitUploader(config, endpoint, UIkitLocal);
+                new UploadFile(config, endpoint_type, UIkitLocal);
             }
+
         });
+
+        /**
+         * Performs a delete operation on the specified file.
+         *
+         * @param {string} id - The identifier of the delete_file object.
+         * @param {string} guid - The file GUID to delete.
+         *
+         * @return {void} - No return value.
+         */
+        global.VDMDeleteFile = function(id, guid) {
+            // Check if the delete_file object exists and is an instance of DeleteFile
+            if (global.VDM.uikit.delete_file[id] && global.VDM.uikit.delete_file[id] instanceof DeleteFile) {
+                // Call the delete method on the DeleteFile instance
+                global.VDM.uikit.delete_file[id].delete(guid);
+            } else {
+                // Log an error or handle the case where the object is missing or invalid
+                console.error(`Error: delete_file with id ${id} is either not defined or not an instance of DeleteFile.`);
+            }
+        };
+
     })(window);
 
 })();
