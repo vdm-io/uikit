@@ -302,7 +302,7 @@
          * @return {void}
          */
         #dispatchEvent(eventName, detail = {}) {
-            document.dispatchEvent(new CustomEvent(`vdm.uikit.display.${eventName}`, {detail}));
+            document.dispatchEvent(new CustomEvent(`vdm.bootstrap.display.${eventName}`, {detail}));
         }
 
         /**
@@ -329,6 +329,511 @@
         };
     }
 
+    const STATUS_TO_CONTEXT = {
+        success: 'success',
+        primary: 'primary',
+        secondary: 'secondary',
+        danger: 'danger',
+        warning: 'warning',
+        info: 'info',
+        light: 'light',
+        dark: 'dark'
+    };
+
+    const STATUS_TO_JOOMLA = {
+        success: 'success',
+        primary: 'message',
+        secondary: 'message',
+        danger: 'error',
+        warning: 'warning',
+        info: 'info',
+        light: 'message',
+        dark: 'message'
+    };
+
+    const DEFAULT_CONTAINER_ID = 'system-message-container';
+
+    /**
+     * Bootstrap powered notification helper with Joomla integrations.
+     */
+    class OctoMeso {
+        #containerId;
+        #fallbackContainer;
+
+        constructor({containerId = DEFAULT_CONTAINER_ID} = {}) {
+            this.#containerId = containerId;
+            this.#fallbackContainer = null;
+        }
+
+        /**
+         * Display a Bootstrap alert style notification.
+         *
+         * @param {object} options
+         * @param {string} options.message
+         * @param {string} [options.status='primary']
+         * @param {number} [options.timeout=5000]
+         * @param {string|null} [options.title=null]
+         */
+        notification({message, status = 'primary', timeout = 5000, title = null} = {}) {
+            if (!message) {
+                return;
+            }
+
+            if (this.#renderWithJoomla({message, status, timeout, title})) {
+                return;
+            }
+
+            const context = STATUS_TO_CONTEXT[status] || STATUS_TO_CONTEXT.primary;
+            const alert = document.createElement('div');
+            alert.className = `alert alert-${context} alert-dismissible fade shadow`;
+            alert.setAttribute('role', 'alert');
+            alert.innerHTML = `
+            <div class="d-flex align-items-center gap-2">
+                ${title ? `<h6 class="mb-0 fw-semibold">${title}</h6>` : ''}
+                <div>${message}</div>
+            </div>
+            <button type="button" class="btn-close" aria-label="Close"></button>
+        `;
+
+            const closeButton = alert.querySelector('.btn-close');
+            closeButton.addEventListener('click', () => this.#dismiss(alert));
+
+            const container = this.#ensureFallbackContainer();
+            container.append(alert);
+            requestAnimationFrame(() => alert.classList.add('show'));
+
+            if (timeout > 0) {
+                setTimeout(() => this.#dismiss(alert), timeout);
+            }
+        }
+
+        #renderWithJoomla({message, status, timeout, title}) {
+            const Joomla = window?.Joomla;
+            if (!Joomla || typeof Joomla.renderMessages !== 'function') {
+                return false;
+            }
+
+            const containerSelector = `#${this.#containerId}`;
+            let container = document.querySelector(containerSelector);
+
+            if (!container) {
+                container = document.createElement('div');
+                container.id = this.#containerId;
+                container.className = 'joomla-alert-container position-fixed top-0 end-0 p-3';
+                container.style.zIndex = '1080';
+                document.body.append(container);
+            }
+
+            const messageType = STATUS_TO_JOOMLA[status] || STATUS_TO_JOOMLA.primary;
+            const content = title ? `<strong>${title}</strong> ${message}` : message;
+
+            Joomla.renderMessages({[messageType]: [content]}, containerSelector);
+
+            if (timeout > 0) {
+                setTimeout(() => {
+                    if (typeof Joomla.removeMessages === 'function') {
+                        Joomla.removeMessages(containerSelector);
+                    } else {
+                        this.#clearContainer(container);
+                    }
+                }, timeout);
+            }
+
+            return true;
+        }
+
+        #clearContainer(container) {
+            const alerts = container?.querySelectorAll('.alert');
+            alerts?.forEach(alert => alert.remove());
+        }
+
+        #dismiss(alert) {
+            alert.classList.remove('show');
+            alert.classList.add('hide');
+            setTimeout(() => {
+                alert.remove();
+            }, 150);
+        }
+
+        #ensureFallbackContainer() {
+            if (this.#fallbackContainer && document.body.contains(this.#fallbackContainer)) {
+                return this.#fallbackContainer;
+            }
+
+            const container = document.createElement('div');
+            container.dataset.octomesoContainer = 'true';
+            container.className = 'position-fixed top-0 end-0 p-3 d-flex flex-column gap-2';
+            container.style.zIndex = '1080';
+            document.body.append(container);
+            this.#fallbackContainer = container;
+            return container;
+        }
+    }
+
+    const MULTIPLE_NAME_SUFFIX = '[]';
+
+    /**
+     * Lightweight file uploader that mimics the UIkit upload API while using
+     * vanilla XMLHttpRequest calls under the hood. Designed to integrate with the
+     * existing UploadFile controller without any external dependency.
+     */
+    class Octofilo {
+        /**
+         * Attach upload behaviour to the provided selector.
+         *
+         * @param {string|HTMLElement|NodeList|HTMLElement[]} selector
+         * @param {object} options
+         */
+        upload(selector, options = {}) {
+            const targets = this.#resolveElements(selector);
+
+            if (!targets.length) {
+                {
+                    console.warn('Octofilo: no upload targets found for selector', selector);
+                }
+                return;
+            }
+
+            targets.forEach(target => this.#bindDropZone(target, options));
+        }
+
+        #resolveElements(selector) {
+            if (!selector) {
+                return [];
+            }
+
+            if (typeof selector === 'string') {
+                return Array.from(document.querySelectorAll(selector));
+            }
+
+            if (selector instanceof Element) {
+                return [selector];
+            }
+
+            if (selector instanceof NodeList || Array.isArray(selector)) {
+                return Array.from(selector).filter(node => node instanceof Element);
+            }
+
+            return [];
+        }
+
+        #bindDropZone(dropZone, options) {
+            dropZone.classList.add('octofilo-dropzone');
+
+            const input = this.#createFileInput(dropZone, options);
+            this.#setupBrowse(dropZone, input);
+            this.#setupDragAndDrop(dropZone, options, input);
+
+            input.addEventListener('change', (event) => {
+                const files = Array.from(event.target.files || []);
+                this.#processFiles(files, dropZone, options).finally(() => {
+                    input.value = '';
+                });
+            });
+        }
+
+        #createFileInput(dropZone, options) {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.hidden = true;
+            input.tabIndex = -1;
+
+            if (options.multiple) {
+                input.multiple = true;
+            }
+
+            this.#applyAccept(input, options.allow);
+
+            dropZone.append(input);
+            return input;
+        }
+
+        #setupBrowse(dropZone, input) {
+            dropZone.addEventListener('click', (event) => {
+                // Avoid triggering a click when users interact with interactive children
+                if (event.target.closest('button, a, input, label, select, textarea')) {
+                    return;
+                }
+
+                input.dispatchEvent(new MouseEvent('click', {bubbles: false}));
+            });
+        }
+
+        #setupDragAndDrop(dropZone, options, input) {
+            const highlight = () => dropZone.classList.add('octofilo-dropzone--hover');
+            const clearHighlight = () => dropZone.classList.remove('octofilo-dropzone--hover');
+
+            ['dragenter', 'dragover'].forEach(eventName => {
+                dropZone.addEventListener(eventName, event => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    highlight();
+                });
+            });
+
+            ['dragleave', 'dragend', 'drop'].forEach(eventName => {
+                dropZone.addEventListener(eventName, event => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    clearHighlight();
+                });
+            });
+
+            dropZone.addEventListener('drop', event => {
+                const files = Array.from(event.dataTransfer?.files || []);
+
+                if (files.length === 0) {
+                    return;
+                }
+
+                this.#processFiles(files, dropZone, options);
+            });
+        }
+
+        #applyAccept(input, allow) {
+            if (!allow) {
+                input.removeAttribute('accept');
+                return;
+            }
+
+            const rules = this.#normaliseAllow(allow).filter(Boolean);
+
+            if (rules.length === 0) {
+                input.removeAttribute('accept');
+                return;
+            }
+
+            const acceptList = rules
+                .map(rule => {
+                    if (rule.startsWith('.')) {
+                        return rule;
+                    }
+                    if (!rule.includes('/') && !rule.startsWith('.')) {
+                        return `.${rule.replace(/^\*\.?/, '')}`;
+                    }
+                    return rule;
+                })
+                .join(',');
+
+            input.setAttribute('accept', acceptList);
+        }
+
+        #normaliseAllow(allow) {
+            if (Array.isArray(allow)) {
+                return allow.flatMap(item => this.#normaliseAllow(item));
+            }
+
+            if (typeof allow === 'string') {
+                return allow
+                    .split(/[|,]/)
+                    .map(rule => rule.trim())
+                    .filter(Boolean);
+            }
+
+            return [];
+        }
+
+        async #processFiles(files, dropZone, options) {
+            if (!files.length || !options.url) {
+                return;
+            }
+
+            const {allowed, rejected} = this.#filterFiles(files, options.allow);
+
+            if (rejected.length && typeof options.error === 'function') {
+                const error = new Error('Some files were rejected because their type is not permitted.');
+                error.files = rejected;
+                options.error(error);
+            }
+
+            if (!allowed.length) {
+                return;
+            }
+
+            if (typeof options.beforeAll === 'function') {
+                options.beforeAll(allowed);
+            }
+
+            let lastResponse = null;
+
+            for (const file of allowed) {
+                try {
+                    // eslint-disable-next-line no-await-in-loop
+                    lastResponse = await this.#uploadSingleFile(file, dropZone, options);
+                } catch (error) {
+                    // Errors are reported via the error callback; continue with remaining files.
+                }
+            }
+
+            if (typeof options.completeAll === 'function') {
+                options.completeAll(lastResponse);
+            }
+        }
+
+        #filterFiles(files, allow) {
+            const rules = this.#normaliseAllow(allow);
+
+            if (!rules.length) {
+                return {allowed: files, rejected: []};
+            }
+
+            const allowed = [];
+            const rejected = [];
+
+            files.forEach(file => {
+                if (this.#isAllowed(file, rules)) {
+                    allowed.push(file);
+                } else {
+                    rejected.push(file);
+                }
+            });
+
+            return {allowed, rejected};
+        }
+
+        #isAllowed(file, rules) {
+            if (!rules.length) {
+                return true;
+            }
+
+            const fileType = (file.type || '').toLowerCase();
+            const extension = file.name.includes('.') ? file.name.split('.').pop().toLowerCase() : '';
+
+            return rules.some(ruleRaw => {
+                const rule = ruleRaw.toLowerCase();
+
+                if (rule === '*' || rule === '*/*') {
+                    return true;
+                }
+
+                if (rule.endsWith('/*')) {
+                    const prefix = rule.replace('/*', '');
+                    return fileType.startsWith(`${prefix}/`);
+                }
+
+                if (rule.includes('/')) {
+                    return fileType === rule;
+                }
+
+                const cleaned = rule.replace(/^[*.]+/, '');
+                return cleaned === extension;
+            });
+        }
+
+        #uploadSingleFile(file, dropZone, options) {
+            return new Promise((resolve, reject) => {
+                const xhr = new XMLHttpRequest();
+                xhr.open('POST', options.url, true);
+
+                const formData = new FormData();
+                const environment = {
+                    data: {params: {}},
+                    file,
+                    formData,
+                    element: dropZone,
+                    xhr,
+                    withCredentials: false,
+                    headers: new Map(),
+                };
+
+                if (typeof options.beforeSend === 'function') {
+                    try {
+                        options.beforeSend(environment);
+                    } catch (error) {
+                        {
+                            console.error('Octofilo beforeSend handler failed', error);
+                        }
+                    }
+                }
+
+                const fieldName = this.#resolveFieldName(options.name, Boolean(options.multiple));
+                formData.append(fieldName, file);
+
+                const params = environment.data?.params || {};
+                Object.keys(params).forEach(key => {
+                    const value = params[key];
+
+                    if (value === undefined || value === null) {
+                        return;
+                    }
+
+                    if (Array.isArray(value)) {
+                        value.forEach(item => formData.append(`${key}${MULTIPLE_NAME_SUFFIX}`, item));
+                    } else {
+                        formData.append(key, value);
+                    }
+                });
+
+                if (environment.withCredentials) {
+                    xhr.withCredentials = true;
+                }
+
+                environment.headers.forEach((value, key) => {
+                    xhr.setRequestHeader(key, value);
+                });
+
+                if (typeof options.loadStart === 'function') {
+                    xhr.upload.addEventListener('loadstart', options.loadStart);
+                }
+
+                if (typeof options.progress === 'function') {
+                    xhr.upload.addEventListener('progress', options.progress);
+                }
+
+                if (typeof options.loadEnd === 'function') {
+                    xhr.upload.addEventListener('loadend', options.loadEnd);
+                }
+
+                xhr.addEventListener('load', event => {
+                    if (typeof options.load === 'function') {
+                        options.load(event);
+                    }
+
+                    if (typeof options.complete === 'function') {
+                        options.complete(xhr);
+                    }
+
+                    resolve(xhr);
+                });
+
+                xhr.addEventListener('error', () => {
+                    const error = new Error('Upload failed.');
+                    if (typeof options.error === 'function') {
+                        options.error(error);
+                    }
+                    reject(error);
+                });
+
+                xhr.send(formData);
+            });
+        }
+
+        #resolveFieldName(name, multiple) {
+            if (!name) {
+                return multiple ? `files${MULTIPLE_NAME_SUFFIX}` : 'file';
+            }
+
+            if (multiple && !name.endsWith(MULTIPLE_NAME_SUFFIX)) {
+                return `${name}${MULTIPLE_NAME_SUFFIX}`;
+            }
+
+            return name;
+        }
+    }
+
+    // Provide minimal styling hooks for drag and drop feedback when Bootstrap utilities are present.
+    const styleId = 'octofilo-style';
+
+    if (typeof document !== 'undefined' && !document.getElementById(styleId)) {
+        const style = document.createElement('style');
+        style.id = styleId;
+        style.textContent = `
+.octofilo-dropzone { cursor: pointer; position: relative; }
+.octofilo-dropzone--hover { outline: 2px dashed var(--bs-primary, #0d6efd); outline-offset: 4px; }
+`;
+        document.head.appendChild(style);
+    }
+
     /**
      * Class for uploading files.
      *
@@ -351,23 +856,84 @@
         #display;
 
         /**
-         * The UIKit variable is a reference to a UI framework for building web applications.
+         * Bootstrap powered notification helper.
          */
-        #uikit;
+        #notifier;
+
+        /**
+         * Upload helper provided by Octofilo.
+         */
+        #uploader;
 
         /**
          * Creates an instance of the UploadFile class.
          *
          * @param {Object} config - Configuration details for uploader instances.
          * @param {string} endpoint - The endpoint where the files will be uploaded.
-         * @param {any} uikit - Reference to UIKit.
+         * @param {object} [options]
+         * @param {object} [options.uploader]
+         * @param {OctoMeso} [options.notifier]
          */
-        constructor(config, endpoint, uikit) {
+        constructor(config, endpoint, {uploader = null, notifier = null} = {}) {
             this.#fileType = new FileType(endpoint);
             this.#display = new Display();
-            this.#uikit = uikit;
+            this.#notifier = notifier instanceof OctoMeso ? notifier : new OctoMeso();
+            this.#uploader = this.#resolveUploader(uploader);
 
             this.#initializeFields(config);
+        }
+
+        /**
+         * Resolve the uploader dependency or throw if unavailable.
+         *
+         * @param {object|function|null} providedUploader
+         * @returns {object}
+         */
+        #resolveUploader(providedUploader) {
+            let uploader = providedUploader;
+
+            if (typeof uploader === 'function') {
+                uploader = new uploader();
+            }
+
+            if (!uploader) {
+                uploader = this.#detectGlobalUploader();
+            }
+
+            if (!uploader) {
+                uploader = new Octofilo();
+            }
+
+            if (typeof uploader === 'function') {
+                uploader = new uploader();
+            }
+
+            if (uploader && typeof uploader.upload === 'function') {
+                return uploader;
+            }
+
+            throw new Error('Octofilo uploader is required. Please provide the dependency or ensure it is available globally.');
+        }
+
+        #detectGlobalUploader() {
+            const globalScope = typeof globalThis !== 'undefined' ? globalThis : window;
+            const globalUploader = globalScope?.Octofilo ?? globalScope?.octofilo;
+
+            if (typeof globalUploader === 'function') {
+                try {
+                    return new globalUploader();
+                } catch (error) {
+                    {
+                        console.error('Failed to initialise the global Octofilo uploader.', error);
+                    }
+                }
+            }
+
+            if (globalUploader && typeof globalUploader.upload === 'function') {
+                return globalUploader;
+            }
+
+            return null;
         }
 
         /**
@@ -452,7 +1018,7 @@
 
                 this.#prepareUploadUI(elements, call, successId, errorId);
 
-                this.#uikit.upload(`#${id}`, {
+                this.#uploader.upload(`#${id}`, {
                     url: this.#buildUrl(uploadEndpoint, typeGuid),
                     multiple: true,
                     allow: this.#fileType.get(call, 'allow', false),
@@ -519,10 +1085,9 @@
          * @return {void} - Does not return a value.
          */
         #showNotification(message, status) {
-            this.#uikit.notification({
+            this.#notifier.notification({
                 message,
                 status,
-                pos: 'top-center',
                 timeout: 7000
             });
         }
@@ -548,7 +1113,7 @@
          * @return {void}
          */
         #dispatchEvent(eventName, detail = {}) {
-            document.dispatchEvent(new CustomEvent(`vdm.uikit.uploader.${eventName}`, {detail}));
+            document.dispatchEvent(new CustomEvent(`vdm.bootstrap.uploader.${eventName}`, {detail}));
         }
 
         /**
@@ -697,6 +1262,121 @@
         }
     }
 
+    const DEFAULT_TITLE = 'Please Confirm';
+    const DEFAULT_CONFIRM = 'Confirm';
+    const DEFAULT_CANCEL = 'Cancel';
+
+    /**
+     * Bootstrap driven modal helper that falls back to the browser confirm dialog
+     * when Bootstrap is unavailable.
+     */
+    class OctoMoe {
+        /**
+         * Display a confirmation modal.
+         *
+         * @param {string} message
+         * @param {object} [options]
+         * @param {string} [options.title='Please Confirm']
+         * @param {string} [options.confirmLabel='Confirm']
+         * @param {string} [options.cancelLabel='Cancel']
+         * @returns {Promise<void>}
+         */
+        confirm(message, {title = DEFAULT_TITLE, confirmLabel = DEFAULT_CONFIRM, cancelLabel = DEFAULT_CANCEL} = {}) {
+            if (!message) {
+                return Promise.resolve();
+            }
+
+            if (window?.bootstrap?.Modal) {
+                return this.#openBootstrapModal({title, message, confirmLabel, cancelLabel});
+            }
+
+            return new Promise((resolve, reject) => {
+                if (window.confirm(`${title}\n\n${message}`)) {
+                    resolve();
+                } else {
+                    reject();
+                }
+            });
+        }
+
+        #openBootstrapModal({title, message, confirmLabel, cancelLabel}) {
+            return new Promise((resolve, reject) => {
+                const modalElement = this.#buildModal({title, message, confirmLabel, cancelLabel});
+                document.body.append(modalElement);
+
+                const modalInstance = new window.bootstrap.Modal(modalElement, {
+                    backdrop: 'static',
+                    keyboard: false
+                });
+
+                let resolved = false;
+
+                const cleanup = () => {
+                    modalElement.removeEventListener('hidden.bs.modal', hiddenHandler);
+                    modalElement.querySelectorAll('[data-action="confirm"]').forEach(button => {
+                        button.removeEventListener('click', confirmHandler);
+                    });
+                    modalElement.querySelectorAll('[data-action="cancel"]').forEach(button => {
+                        button.removeEventListener('click', cancelHandler);
+                    });
+                    modalElement.remove();
+                };
+
+                const confirmHandler = () => {
+                    resolved = true;
+                    resolve();
+                    modalInstance.hide();
+                };
+
+                const cancelHandler = () => {
+                    modalInstance.hide();
+                };
+
+                const hiddenHandler = () => {
+                    cleanup();
+                    if (!resolved) {
+                        reject();
+                    }
+                };
+
+                modalElement.addEventListener('hidden.bs.modal', hiddenHandler);
+                modalElement.querySelectorAll('[data-action="confirm"]').forEach(button => {
+                    button.addEventListener('click', confirmHandler);
+                });
+                modalElement.querySelectorAll('[data-action="cancel"]').forEach(button => {
+                    button.addEventListener('click', cancelHandler);
+                });
+
+                modalInstance.show();
+            });
+        }
+
+        #buildModal({title, message, confirmLabel, cancelLabel}) {
+            const modal = document.createElement('div');
+            modal.className = 'modal fade';
+            modal.tabIndex = -1;
+            modal.setAttribute('role', 'dialog');
+            modal.innerHTML = `
+            <div class="modal-dialog" role="document">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">${title}</h5>
+                        <button type="button" class="btn-close" data-action="cancel" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p class="mb-0">${message}</p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-action="cancel">${cancelLabel}</button>
+                        <button type="button" class="btn btn-primary" data-action="confirm">${confirmLabel}</button>
+                    </div>
+                </div>
+            </div>
+        `;
+            return modal;
+        }
+    }
+
     /**
      * Helper class for deleting files from the server.
      *
@@ -715,9 +1395,14 @@
         #endpoint;
 
         /**
-         * The UIKit variable is a reference to a UI framework for building web applications.
+         * Bootstrap notification helper.
          */
-        #uikit;
+        #notifier;
+
+        /**
+         * Bootstrap modal helper.
+         */
+        #modal;
 
         /**
          * The error message that is displayed when the delete endpoint is not configured.
@@ -730,11 +1415,14 @@
          * Creates an instance of the DeleteHelper class.
          *
          * @param {string} endpoint - The endpoint where the files will be uploaded.
-         * @param {any} uikit - Reference to UIKit.
+         * @param {object} [options]
+         * @param {OctoMeso} [options.notifier]
+         * @param {OctoMoe} [options.modal]
          */
-        constructor(endpoint, uikit) {
+        constructor(endpoint, {notifier = null, modal = null} = {}) {
             this.#endpoint = endpoint;
-            this.#uikit = uikit;
+            this.#notifier = notifier instanceof OctoMeso ? notifier : new OctoMeso();
+            this.#modal = modal instanceof OctoMoe ? modal : new OctoMoe();
         }
 
         /**
@@ -749,12 +1437,16 @@
                 return;
             }
 
-            if (confirm) {
-                this.#uikit.modal.confirm('Are you sure you want to delete this file! It can not be undone!')
-                    .then(() => this.#serverDelete(fileGuid));
-            } else {
-                this.#serverDelete(fileGuid);
+            const executeDelete = () => this.#serverDelete(fileGuid);
+
+            if (!confirm) {
+                executeDelete();
+                return;
             }
+
+            this.#modal.confirm('Are you sure you want to delete this file! It can not be undone!')
+                .then(executeDelete)
+                .catch(() => {});
         }
 
         /**
@@ -809,10 +1501,9 @@
          * @return {void} - Does not return a value.
          */
         #showNotification(message, status) {
-            this.#uikit.notification({
+            this.#notifier.notification({
                 message,
                 status,
-                pos: 'top-center',
                 timeout: 7000
             });
         }
@@ -842,7 +1533,7 @@
          * @return {void}
          */
         #dispatchEvent(eventName, detail = {}) {
-            document.dispatchEvent(new CustomEvent(`vdm.uikit.delete.${eventName}`, {detail}));
+            document.dispatchEvent(new CustomEvent(`vdm.bootstrap.delete.${eventName}`, {detail}));
         }
 
         /**
@@ -858,21 +1549,18 @@
     }
 
     (function(global) {
+        if (!global.Octofilo) {
+            global.Octofilo = Octofilo;
+        }
+
         document.addEventListener('DOMContentLoaded', function() {
-            let UIkitLocal;
-
-            if (!global.UIkit) {
-                UIkitLocal = require('uikit').default;
-            } else {
-                UIkitLocal = global.UIkit;
-            }
-
             if (!global.VDM) {
                 console.error('VDM is not defined, exiting initialization.');
                 return;
             }
 
-            const { endpoint_type, target_class, ...additionalConfig } = global.VDM.uikit.config || {};
+            const bootstrapConfig = global.VDM.bootstrap || global.VDM.standalone || {};
+            const { endpoint_type, target_class, ...additionalConfig } = bootstrapConfig.config || {};
 
             if (!endpoint_type) {
                 console.error('File Type Endpoint is not defined, exiting initialization.');
@@ -887,10 +1575,17 @@
             const uploadElements = document.querySelectorAll('.' + target_class);
             const config = {};
 
-            // Ensure the global.VDM.uikit.delete_file exists, or initialize it
-            if (!global.VDM.uikit.delete_file) {
-                global.VDM.uikit.delete_file = {};  // Initialize delete_file object if it doesn't exist
+            const notifier = new OctoMeso();
+            const modal = new OctoMoe();
+            const uploader = resolveUploader(global) ?? new Octofilo();
+
+            // Ensure the delete_file namespace exists, or initialize it
+            bootstrapConfig.delete_file = bootstrapConfig.delete_file || {};
+
+            if (!global.VDM.bootstrap) {
+                global.VDM.bootstrap = bootstrapConfig;
             }
+            global.VDM.standalone = bootstrapConfig; // maintain backward compatibility
 
             uploadElements.forEach(element => {
                 const id = element.getAttribute('id');
@@ -928,12 +1623,12 @@
                 // if delete endpoint found
                 if (deleteEndpoint)
                 {
-                    global.VDM.uikit.delete_file[id] = new DeleteFile(deleteEndpoint, UIkitLocal);
+                    bootstrapConfig.delete_file[id] = new DeleteFile(deleteEndpoint, {notifier, modal});
                 }
             });
 
             if (Object.keys(config).length > 0) {
-                new UploadFile(config, endpoint_type, UIkitLocal);
+                new UploadFile(config, endpoint_type, {uploader, notifier});
             }
 
         });
@@ -947,7 +1642,7 @@
          * @return {void} - No return value.
          */
         global.VDMDeleteFile = function(id, guid) {
-            const deleteInstance = global.VDM.uikit.delete_file[id];
+            const deleteInstance = global.VDM.bootstrap?.delete_file?.[id] ?? global.VDM.standalone?.delete_file?.[id];
 
             if (!deleteInstance || !(deleteInstance instanceof DeleteFile)) {
                 console.error(`Error: delete_file with id ${id} is either not defined or not an instance of DeleteFile.`);
@@ -965,7 +1660,7 @@
          * @return {void}
          */
         global.VDMDeleteFiles = function(id, guids) {
-            const deleteInstance = global.VDM.uikit.delete_file[id];
+            const deleteInstance = global.VDM.bootstrap?.delete_file?.[id] ?? global.VDM.standalone?.delete_file?.[id];
 
             if (!Array.isArray(guids) || guids.length === 0) {
                 console.error('No GUIDs provided for deletion.');
@@ -978,7 +1673,7 @@
             }
 
             // Dispatch before batch delete
-            document.dispatchEvent(new CustomEvent('vdm.uikit.delete.beforeFilesDelete', { guids: guids }));
+            document.dispatchEvent(new CustomEvent('vdm.bootstrap.delete.beforeFilesDelete', { guids: guids }));
 
             const [first, ...rest] = guids;
             const allGuids = [...guids];
@@ -1000,19 +1695,43 @@
 
                 // All deletions done
                 if (deletedGuids.size === allGuids.length) {
-                    document.removeEventListener('vdm.uikit.delete.afterFileDelete', afterDeleteHandler);
-                    document.dispatchEvent(new CustomEvent('vdm.uikit.delete.afterFilesDelete', { guids: allGuids }));
+                    document.removeEventListener('vdm.bootstrap.delete.afterFileDelete', afterDeleteHandler);
+                    document.dispatchEvent(new CustomEvent('vdm.bootstrap.delete.afterFilesDelete', { guids: allGuids }));
                 }
             };
 
             // Attach the after delete listener
-            document.addEventListener('vdm.uikit.delete.afterFileDelete', afterDeleteHandler);
+            document.addEventListener('vdm.bootstrap.delete.afterFileDelete', afterDeleteHandler);
 
-            document.dispatchEvent(new CustomEvent('vdm.uikit.delete.beforeFirstFileDelete', { guid: first }));
+            document.dispatchEvent(new CustomEvent('vdm.bootstrap.delete.beforeFirstFileDelete', { guid: first }));
 
             // Initiate the first deletion (with confirmation)
             deleteInstance.delete(first);
         };
+
+        function resolveUploader(globalScope) {
+            const providedUploader = globalScope.Octofilo ?? globalScope.octofilo ?? null;
+
+            if (!providedUploader) {
+                return null;
+            }
+
+            if (typeof providedUploader === 'function') {
+                try {
+                    return new providedUploader();
+                } catch (error) {
+                    console.error('Failed to initialise Octofilo uploader.', error);
+                    return null;
+                }
+            }
+
+            if (typeof providedUploader.upload === 'function') {
+                return providedUploader;
+            }
+
+            console.error('Octofilo uploader does not expose an upload method.');
+            return null;
+        }
 
     })(window);
 

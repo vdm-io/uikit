@@ -1,22 +1,22 @@
 import { UploadFile } from './core/upload-file';
 import { DeleteFile } from './core/delete-file';
+import { OctoMeso } from './ui/octomeso.js';
+import { OctoMoe } from './ui/octomoe.js';
+import { Octofilo } from './ui/octofilo.js';
 
 (function(global) {
+    if (!global.Octofilo) {
+        global.Octofilo = Octofilo;
+    }
+
     document.addEventListener('DOMContentLoaded', function() {
-        let UIkitLocal;
-
-        if (!global.UIkit) {
-            UIkitLocal = require('uikit').default;
-        } else {
-            UIkitLocal = global.UIkit;
-        }
-
         if (!global.VDM) {
             if (process.env.DEBUG) console.error('VDM is not defined, exiting initialization.');
             return;
         }
 
-        const { endpoint_type, target_class, ...additionalConfig } = global.VDM.uikit.config || {};
+        const bootstrapConfig = global.VDM.bootstrap || global.VDM.standalone || {};
+        const { endpoint_type, target_class, ...additionalConfig } = bootstrapConfig.config || {};
 
         if (!endpoint_type) {
             if (process.env.DEBUG) console.error('File Type Endpoint is not defined, exiting initialization.');
@@ -31,10 +31,17 @@ import { DeleteFile } from './core/delete-file';
         const uploadElements = document.querySelectorAll('.' + target_class);
         const config = {};
 
-        // Ensure the global.VDM.uikit.delete_file exists, or initialize it
-        if (!global.VDM.uikit.delete_file) {
-            global.VDM.uikit.delete_file = {};  // Initialize delete_file object if it doesn't exist
+        const notifier = new OctoMeso();
+        const modal = new OctoMoe();
+        const uploader = resolveUploader(global) ?? new Octofilo();
+
+        // Ensure the delete_file namespace exists, or initialize it
+        bootstrapConfig.delete_file = bootstrapConfig.delete_file || {};
+
+        if (!global.VDM.bootstrap) {
+            global.VDM.bootstrap = bootstrapConfig;
         }
+        global.VDM.standalone = bootstrapConfig; // maintain backward compatibility
 
         uploadElements.forEach(element => {
             const id = element.getAttribute('id');
@@ -72,12 +79,12 @@ import { DeleteFile } from './core/delete-file';
             // if delete endpoint found
             if (deleteEndpoint)
             {
-                global.VDM.uikit.delete_file[id] = new DeleteFile(deleteEndpoint, UIkitLocal);
+                bootstrapConfig.delete_file[id] = new DeleteFile(deleteEndpoint, {notifier, modal});
             }
         });
 
         if (Object.keys(config).length > 0) {
-            new UploadFile(config, endpoint_type, UIkitLocal);
+            new UploadFile(config, endpoint_type, {uploader, notifier});
         }
 
     });
@@ -91,7 +98,7 @@ import { DeleteFile } from './core/delete-file';
      * @return {void} - No return value.
      */
     global.VDMDeleteFile = function(id, guid) {
-        const deleteInstance = global.VDM.uikit.delete_file[id];
+        const deleteInstance = global.VDM.bootstrap?.delete_file?.[id] ?? global.VDM.standalone?.delete_file?.[id];
 
         if (!deleteInstance || !(deleteInstance instanceof DeleteFile)) {
             if (process.env.DEBUG) console.error(`Error: delete_file with id ${id} is either not defined or not an instance of DeleteFile.`);
@@ -109,7 +116,7 @@ import { DeleteFile } from './core/delete-file';
      * @return {void}
      */
     global.VDMDeleteFiles = function(id, guids) {
-        const deleteInstance = global.VDM.uikit.delete_file[id];
+        const deleteInstance = global.VDM.bootstrap?.delete_file?.[id] ?? global.VDM.standalone?.delete_file?.[id];
 
         if (!Array.isArray(guids) || guids.length === 0) {
             if (process.env.DEBUG) console.error('No GUIDs provided for deletion.');
@@ -122,7 +129,7 @@ import { DeleteFile } from './core/delete-file';
         }
 
         // Dispatch before batch delete
-        document.dispatchEvent(new CustomEvent('vdm.uikit.delete.beforeFilesDelete', { guids: guids }));
+        document.dispatchEvent(new CustomEvent('vdm.bootstrap.delete.beforeFilesDelete', { guids: guids }));
 
         const [first, ...rest] = guids;
         const allGuids = [...guids];
@@ -144,18 +151,42 @@ import { DeleteFile } from './core/delete-file';
 
             // All deletions done
             if (deletedGuids.size === allGuids.length) {
-                document.removeEventListener('vdm.uikit.delete.afterFileDelete', afterDeleteHandler);
-                document.dispatchEvent(new CustomEvent('vdm.uikit.delete.afterFilesDelete', { guids: allGuids }));
+                document.removeEventListener('vdm.bootstrap.delete.afterFileDelete', afterDeleteHandler);
+                document.dispatchEvent(new CustomEvent('vdm.bootstrap.delete.afterFilesDelete', { guids: allGuids }));
             }
         };
 
         // Attach the after delete listener
-        document.addEventListener('vdm.uikit.delete.afterFileDelete', afterDeleteHandler);
+        document.addEventListener('vdm.bootstrap.delete.afterFileDelete', afterDeleteHandler);
 
-        document.dispatchEvent(new CustomEvent('vdm.uikit.delete.beforeFirstFileDelete', { guid: first }));
+        document.dispatchEvent(new CustomEvent('vdm.bootstrap.delete.beforeFirstFileDelete', { guid: first }));
 
         // Initiate the first deletion (with confirmation)
         deleteInstance.delete(first);
     };
+
+    function resolveUploader(globalScope) {
+        const providedUploader = globalScope.Octofilo ?? globalScope.octofilo ?? null;
+
+        if (!providedUploader) {
+            return null;
+        }
+
+        if (typeof providedUploader === 'function') {
+            try {
+                return new providedUploader();
+            } catch (error) {
+                if (process.env.DEBUG) console.error('Failed to initialise Octofilo uploader.', error);
+                return null;
+            }
+        }
+
+        if (typeof providedUploader.upload === 'function') {
+            return providedUploader;
+        }
+
+        if (process.env.DEBUG) console.error('Octofilo uploader does not expose an upload method.');
+        return null;
+    }
 
 })(window);

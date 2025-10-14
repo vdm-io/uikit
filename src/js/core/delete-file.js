@@ -1,3 +1,6 @@
+import {OctoMeso} from '../ui/octomeso.js';
+import {OctoMoe} from '../ui/octomoe.js';
+
 /**
  * Helper class for deleting files from the server.
  *
@@ -16,9 +19,14 @@ export class DeleteFile {
     #endpoint;
 
     /**
-     * The UIKit variable is a reference to a UI framework for building web applications.
+     * Bootstrap notification helper.
      */
-    #uikit;
+    #notifier;
+
+    /**
+     * Bootstrap modal helper.
+     */
+    #modal;
 
     /**
      * The error message that is displayed when the delete endpoint is not configured.
@@ -31,11 +39,14 @@ export class DeleteFile {
      * Creates an instance of the DeleteHelper class.
      *
      * @param {string} endpoint - The endpoint where the files will be uploaded.
-     * @param {any} uikit - Reference to UIKit.
+     * @param {object} [options]
+     * @param {OctoMeso} [options.notifier]
+     * @param {OctoMoe} [options.modal]
      */
-    constructor(endpoint, uikit) {
+    constructor(endpoint, {notifier = null, modal = null} = {}) {
         this.#endpoint = endpoint;
-        this.#uikit = uikit;
+        this.#notifier = notifier instanceof OctoMeso ? notifier : new OctoMeso();
+        this.#modal = modal instanceof OctoMoe ? modal : new OctoMoe();
     }
 
     /**
@@ -50,12 +61,16 @@ export class DeleteFile {
             return;
         }
 
-        if (confirm) {
-            this.#uikit.modal.confirm('Are you sure you want to delete this file! It can not be undone!')
-                .then(() => this.#serverDelete(fileGuid));
-        } else {
-            this.#serverDelete(fileGuid);
+        const executeDelete = () => this.#serverDelete(fileGuid);
+
+        if (!confirm) {
+            executeDelete();
+            return;
         }
+
+        this.#modal.confirm('Are you sure you want to delete this file! It can not be undone!')
+            .then(executeDelete)
+            .catch(() => {});
     }
 
     /**
@@ -110,10 +125,9 @@ export class DeleteFile {
      * @return {void} - Does not return a value.
      */
     #showNotification(message, status) {
-        this.#uikit.notification({
+        this.#notifier.notification({
             message,
             status,
-            pos: 'top-center',
             timeout: 7000
         });
     }
@@ -143,7 +157,7 @@ export class DeleteFile {
      * @return {void}
      */
     #dispatchEvent(eventName, detail = {}) {
-        document.dispatchEvent(new CustomEvent(`vdm.uikit.delete.${eventName}`, {detail}));
+        document.dispatchEvent(new CustomEvent(`vdm.bootstrap.delete.${eventName}`, {detail}));
     }
 
     /**

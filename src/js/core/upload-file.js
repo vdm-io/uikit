@@ -1,5 +1,7 @@
 import {FileType} from '../util/file-type.js';
 import {Display} from '../util/display.js';
+import {OctoMeso} from '../ui/octomeso.js';
+import {Octofilo} from '../ui/octofilo.js';
 
 /**
  * Class for uploading files.
@@ -23,23 +25,84 @@ export class UploadFile {
     #display;
 
     /**
-     * The UIKit variable is a reference to a UI framework for building web applications.
+     * Bootstrap powered notification helper.
      */
-    #uikit;
+    #notifier;
+
+    /**
+     * Upload helper provided by Octofilo.
+     */
+    #uploader;
 
     /**
      * Creates an instance of the UploadFile class.
      *
      * @param {Object} config - Configuration details for uploader instances.
      * @param {string} endpoint - The endpoint where the files will be uploaded.
-     * @param {any} uikit - Reference to UIKit.
+     * @param {object} [options]
+     * @param {object} [options.uploader]
+     * @param {OctoMeso} [options.notifier]
      */
-    constructor(config, endpoint, uikit) {
+    constructor(config, endpoint, {uploader = null, notifier = null} = {}) {
         this.#fileType = new FileType(endpoint);
         this.#display = new Display();
-        this.#uikit = uikit;
+        this.#notifier = notifier instanceof OctoMeso ? notifier : new OctoMeso();
+        this.#uploader = this.#resolveUploader(uploader);
 
         this.#initializeFields(config);
+    }
+
+    /**
+     * Resolve the uploader dependency or throw if unavailable.
+     *
+     * @param {object|function|null} providedUploader
+     * @returns {object}
+     */
+    #resolveUploader(providedUploader) {
+        let uploader = providedUploader;
+
+        if (typeof uploader === 'function') {
+            uploader = new uploader();
+        }
+
+        if (!uploader) {
+            uploader = this.#detectGlobalUploader();
+        }
+
+        if (!uploader) {
+            uploader = new Octofilo();
+        }
+
+        if (typeof uploader === 'function') {
+            uploader = new uploader();
+        }
+
+        if (uploader && typeof uploader.upload === 'function') {
+            return uploader;
+        }
+
+        throw new Error('Octofilo uploader is required. Please provide the dependency or ensure it is available globally.');
+    }
+
+    #detectGlobalUploader() {
+        const globalScope = typeof globalThis !== 'undefined' ? globalThis : window;
+        const globalUploader = globalScope?.Octofilo ?? globalScope?.octofilo;
+
+        if (typeof globalUploader === 'function') {
+            try {
+                return new globalUploader();
+            } catch (error) {
+                if (process.env.DEBUG) {
+                    console.error('Failed to initialise the global Octofilo uploader.', error);
+                }
+            }
+        }
+
+        if (globalUploader && typeof globalUploader.upload === 'function') {
+            return globalUploader;
+        }
+
+        return null;
     }
 
     /**
@@ -124,7 +187,7 @@ export class UploadFile {
 
             this.#prepareUploadUI(elements, call, successId, errorId);
 
-            this.#uikit.upload(`#${id}`, {
+            this.#uploader.upload(`#${id}`, {
                 url: this.#buildUrl(uploadEndpoint, typeGuid),
                 multiple: true,
                 allow: this.#fileType.get(call, 'allow', false),
@@ -191,10 +254,9 @@ export class UploadFile {
      * @return {void} - Does not return a value.
      */
     #showNotification(message, status) {
-        this.#uikit.notification({
+        this.#notifier.notification({
             message,
             status,
-            pos: 'top-center',
             timeout: 7000
         });
     }
@@ -220,7 +282,7 @@ export class UploadFile {
      * @return {void}
      */
     #dispatchEvent(eventName, detail = {}) {
-        document.dispatchEvent(new CustomEvent(`vdm.uikit.uploader.${eventName}`, {detail}));
+        document.dispatchEvent(new CustomEvent(`vdm.bootstrap.uploader.${eventName}`, {detail}));
     }
 
     /**

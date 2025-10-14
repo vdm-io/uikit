@@ -99,7 +99,7 @@ export class Display {
      * @return {void}
      */
     #dispatchEvent(eventName, detail = {}) {
-        document.dispatchEvent(new CustomEvent(`vdm.uikit.display.${eventName}`, {detail}));
+        document.dispatchEvent(new CustomEvent(`vdm.bootstrap.display.${eventName}`, {detail}));
     }
 
     /**

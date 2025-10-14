@@ -1,7 +1,7 @@
 {
-  "name": "vdm.uikit",
-  "title": "VDM Uikit",
-  "description": "VDM-Uikit is an intuitive and lightweight JavaScript (extension) to Uikit for embedding upload/delete  functionality of server files into your website.",
+  "name": "vdm.bootstrap",
+  "title": "VDM Bootstrap",
+  "description": "VDM Bootstrap provides JavaScript helpers for integrating Octofilo uploads with Bootstrap 5 notifications and modals.",
   "version": "3.0.2",
   "main": "dist/js/vdm.min.js",
   "type": "module",
@@ -17,9 +17,7 @@
     "url": "https://git.vdm.dev/joomla/uikit/issues"
   },
   "homepage": "https://git.vdm.dev/joomla/uikit",
-  "dependencies": {
-    "uikit": "latest"
-  },
+  "dependencies": {},
   "devDependencies": {
     "@babel/core": "latest",
     "@babel/preset-env": "latest",
